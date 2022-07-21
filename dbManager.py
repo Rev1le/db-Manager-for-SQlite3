@@ -1,38 +1,42 @@
 import sqlite3
+import uuid
+import requests
+
 
 class dbManager():
+    dbName = 'dsDB'
 
-    def __init__(self, table_name :str = None, table_fields_execute :str = None, table_fields :dict= None):
+    def __init__(self, table_name :str = None, table_fields :dict= None):
         
         if  table_name is None or \
-            table_fields is None or \
-            table_fields_execute is None:
+            table_fields is None:
             raise Exception('Введите данные для table_name и table_fields')
         
-        self.__connection = sqlite3.connect('dsDB.db')
+        self.__connection = sqlite3.connect(self.dbName + '.db')
         self.__cur :Cursor = self.__connection.cursor()
         
         self.table_fields :dict = table_fields
         self.table_name :str = table_name
 
+        fields_sql_request = ""
 
-        #####Из словаря формаировать SQL запрос для создания таблиц в БД
-        #str_for_table = ""
-        #for key in table_fields.keys():
-            #str_for_table+=f" {key} {table_fields[key],}"
-        #print("вывод строки для формирования таблицы в БД: ",str_for_table)
+        for field_name in table_fields.keys():
+            fields_sql_request += f"{field_name} {table_fields[field_name]}, "
+        
+        fields_sql_request = fields_sql_request[:-2]
 
-        self.__cur.execute(table_fields_execute)
+        execute_sql_requst = f"""CREATE TABLE IF NOT EXISTS {table_name}({fields_sql_request});"""
+        print(f"Запрос для создания таблицы {self.table_name}: ",execute_sql_requst)
+
+        self.__cur.execute(execute_sql_requst)
         self.__connection.commit()
-    
 
     def close_DB(self):
         '''
         Закрывает базу данных
         '''
         self.__connection.close()
-    
-
+ 
     def table_column(self):
         '''
         Возвращает columns из таблицы
@@ -43,8 +47,6 @@ class dbManager():
         self.__cur.execute(f'''SELECT DISTINCT {column_name} FROM {self.table_name}''')
         self.__connection.commit()
         return self.__cur.fetchall()
-
-
 
     def data_entry(self, **kwargs):
         '''
@@ -58,9 +60,7 @@ class dbManager():
         
         tmp :str = str("?, " * len(self.table_fields.keys()))[:-2]
         ## Формирование строкуЮ состоящую из ?, для SQl запроса
-        ##
-        #tmp= tmp[:-2]
-        #print(tmp, mass_values)
+
         try:
             self.__cur.execute(f"INSERT INTO {self.table_name} VALUES({tmp});", mass_values)
         except :
@@ -85,33 +85,22 @@ class dbManager():
         '''
         Отправляет запрос в БД для получения записи по ключевым значениям
         '''
-
-        #db_request :str = " "
-        #for key in kwargs.keys():
-        #    db_request+=f" {key} = '{kwargs[key]}' AND"
         
         db_request :str = " ".join([f"{key} = '{kwargs[key]}' AND" for key in kwargs.keys()])[:-4]
         ## Генерирует массив с ключами и значениями,
         ## после чего преобразовывает в массив и удаляет последнее слово  AND
-        ##
-        #db_request = str(" ".join(tmp))[:-4]
         
-        #db_request[:-4]
-        #print(str(" ".join(db_request2))[:-4])
         try:
             sql_request :Cursor = self.__cur.execute(f"SELECT * FROM {self.table_name} WHERE {db_request}")
             self.__connection.commit()
         except :
             raise Exception('Введенные данные не соответсвуют столбцам таблицы')
+
+        if iter_cur: return sql_request
         
-
-        if iter_cur:
-            return sql_request
-
         return self.__cur.fetchall()
 
-
-
+    
     #При формировании новый класс методов, можно делать новые таблицы
 
     @classmethod
@@ -119,32 +108,16 @@ class dbManager():
         """Данный метод класса отправляет параметры в __init__ класса для создания таблицы с мемами"""
         
         table_name :str = "memSaved"
-
-        table_fields :str = f"""CREATE TABLE IF NOT EXISTS memSaved(
-        name TEXT,
-        url TEXT,
-        id_user INT);"""
         
         return ctx(table_name = table_name,\
-            table_fields_execute = table_fields,\
             table_fields = {"name" : "TEXT", "url" : "TEXT", "id_user" : "INT"})
     
 
     @classmethod
     def academicDB(ctx):
-        table_name :str = "academicSugjects"
-
-        table_fields :str = f"""CREATE TABLE IF NOT EXISTS academicSugjects(
-        id_user INT NOT NULL,
-        subject TEXT NOT NULL,
-        url TEXT UNIQUE NOT NULL,
-        type_work TEXT NOT NULL,
-        num_work INT NOT NULL,
-        author TEXT,
-        notes TEXT);"""
+        table_name :str = "academicSugjects" # ТУПОЕ ГОВНО Sugjects нет такого слово, есть Subjects
         
         return ctx(table_name = table_name,\
-            table_fields_execute = table_fields,\
             table_fields = {
                 "id_user" : "INT NOT NULL", 
                 "subject" : "TEXT NOT NULL",
